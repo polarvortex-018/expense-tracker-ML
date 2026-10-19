@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cash Buddy</string>
+    <string name="title_activity_main">Cash Buddy</string>
+    <string name="package_name">com.cashbuddy.app</string>
+    <string name="custom_url_scheme">com.cashbuddy.app</string>
+</resources>

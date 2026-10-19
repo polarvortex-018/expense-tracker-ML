@@ -1,0 +1,17 @@
+{
+  "name": "simple-local-expense-tracker",
+  "version": "2.0.0",
+  "description": "Portable, Local-First Financial Tracker with Savings Buckets and Multi-Vault Management",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"backend,frontend\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && (.\\.venv\\Scripts\\python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 || .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 || python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 || python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000)",
+    "dev:frontend": "cd frontend && npm run dev -- --host 0.0.0.0",
+    "serve": "cd frontend && npm run preview -- --host 0.0.0.0 --port 4173",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

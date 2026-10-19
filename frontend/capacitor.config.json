@@ -1,0 +1,19 @@
+{
+  "appId": "com.cashbuddy.app",
+  "appName": "Cash Buddy",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0f0f15"
+    }
+  }
+}
