@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { api } from './services/api';
 import { saveAccountOrder } from './utils/accountSorter.js';
 import Dashboard from './components/Dashboard.vue';
@@ -17,6 +17,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 
 // State
 const currentTab = ref('dashboard'); // 'dashboard', 'transactions', 'debts', or 'settings'
+const cashBuddyAnswerOpen = ref(false);
 const transactions = ref([]);
 const dashboardTransactions = ref([]);
 const transactionSummary = ref({ total_count: 0, total_income: 0, total_expense: 0, categories_breakdown: [] });
@@ -591,6 +592,7 @@ const handleWindowScroll = () => {
 };
 
 onMounted(() => {
+  window.addEventListener('cashbuddy-answer-open', handleCashBuddyAnswerOpen);
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   if (typeof window !== 'undefined' && window.visualViewport) {
     const handleVVResize = () => {
@@ -612,7 +614,9 @@ onMounted(() => {
     StatusBar.setBackgroundColor({ color: '#0f0f15' }).catch(() => {});
 
     CapApp.addListener('backButton', () => {
-      if (floatingInput.value.show) {
+      if (cashBuddyAnswerOpen.value) {
+        window.dispatchEvent(new Event('cashbuddy:back'));
+      } else if (floatingInput.value.show) {
         floatingInput.value.show = false;
       } else if (showForm.value) {
         showForm.value = false;
@@ -628,6 +632,14 @@ onMounted(() => {
     });
   }
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener('cashbuddy-answer-open', handleCashBuddyAnswerOpen);
+});
+
+function handleCashBuddyAnswerOpen(event) {
+  cashBuddyAnswerOpen.value = event.detail === true;
+}
 </script>
 
 <template>

@@ -79,162 +79,16 @@
         <h3 class="text-sm font-bold text-[#f1f0f5] tracking-tight">Expenses Breakdown ({{ currentMonthLabel }})</h3>
       </div>
 
-      <div v-if="dashboardPiePaths.length === 0" class="py-8 text-center text-xs font-medium text-[#9e9cae]">
+      <div v-if="!totalFilteredCategoryExpense || filteredCategoryExpenses.length === 0" class="py-8 text-center text-xs font-medium text-[#9e9cae]">
         No expense records found for this month.
       </div>
-
-      <div v-else class="space-y-4 py-1">
-        <!-- Donut Chart SVG -->
-        <div class="flex items-center justify-center py-2">
-          <div class="relative w-56 h-56 flex items-center justify-center shrink-0">
-            <svg class="w-full h-full overflow-visible" viewBox="-30 -30 260 260">
-              <defs>
-                <!-- Smooth Ambient Radial Gradient Glow for Active Category -->
-                <radialGradient v-if="activeHoveredCategoryInfo" id="dashboard-radial-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" :stop-color="activeHoveredCategoryInfo.color" stop-opacity="0.4" />
-                  <stop offset="60%" :stop-color="activeHoveredCategoryInfo.color" stop-opacity="0.15" />
-                  <stop offset="100%" :stop-color="activeHoveredCategoryInfo.color" stop-opacity="0" />
-                </radialGradient>
-              </defs>
-
-              <!-- Ambient Breathing Radial Glow Aura for Active Category -->
-              <circle
-                v-if="activeHoveredCategoryInfo"
-                cx="100"
-                cy="100"
-                r="90"
-                fill="url(#dashboard-radial-glow)"
-                class="animate-breathe-glow transition-all duration-700 pointer-events-none origin-[100px_100px]"
-              />
-
-              <!-- Floating Orbiting Sparkle Particles -->
-              <g class="pointer-events-none">
-                <g class="animate-orbit-1 origin-[100px_100px]">
-                  <circle 
-                    cx="222" cy="100" r="2.2" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#D4BFFF'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                  />
-                </g>
-                <g class="animate-orbit-2 origin-[100px_100px]">
-                  <circle 
-                    cx="161" cy="205" r="1.8" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#B3F5E1'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                    style="animation-delay: 0.5s;"
-                  />
-                </g>
-                <g class="animate-orbit-3 origin-[100px_100px]">
-                  <circle 
-                    cx="39" cy="205" r="2.5" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#FFD1B3'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                    style="animation-delay: 1s;"
-                  />
-                </g>
-                <g class="animate-orbit-4 origin-[100px_100px]">
-                  <circle 
-                    cx="-22" cy="100" r="1.6" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#c084fc'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                    style="animation-delay: 1.5s;"
-                  />
-                </g>
-                <g class="animate-orbit-5 origin-[100px_100px]">
-                  <circle 
-                    cx="39" cy="-5" r="2.2" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#38bdf8'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                    style="animation-delay: 2s;"
-                  />
-                </g>
-                <g class="animate-orbit-6 origin-[100px_100px]">
-                  <circle 
-                    cx="161" cy="-5" r="1.8" 
-                    :fill="activeHoveredCategoryInfo ? activeHoveredCategoryInfo.color : '#f472b6'" 
-                    class="particle-dot transition-colors duration-500 opacity-90"
-                    style="animation-delay: 2.5s;"
-                  />
-                </g>
-              </g>
-
-              <!-- Donut Slices Group with Smooth Orbit & Snap-to-Top Rotation -->
-              <g 
-                class="transition-transform duration-700 ease-out origin-[100px_100px]"
-                :style="{
-                  transformOrigin: '100px 100px',
-                  transform: chartRotationTransform
-                }"
-              >
-                <g
-                  v-for="segment in dashboardPiePaths"
-                  :key="segment.name"
-                  class="cursor-pointer"
-                  @mouseenter="hoveredCategoryIndex = segment.originalIndex"
-                  @mouseleave="hoveredCategoryIndex = null"
-                  @click="toggleSelectCategory(segment.originalIndex)"
-                >
-                  <path :d="segment.hitD" fill="transparent" />
-                  <path
-                    :d="segment.d"
-                    :fill="segment.color"
-                    class="transition-all duration-300 pointer-events-none"
-                    :style="{
-                      transformOrigin: '100px 100px',
-                      transform: activeDashboardIndex === segment.originalIndex ? 'scale(1.07)' : 'scale(1)',
-                      opacity: activeDashboardIndex === null || activeDashboardIndex === segment.originalIndex ? 1 : 0.35
-                    }"
-                  />
-                </g>
-              </g>
-            </svg>
-
-            <!-- Center Readout -->
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-3">
-              <span class="text-[11px] font-semibold text-[#9e9cae] uppercase tracking-wider truncate max-w-[120px]">
-                {{ activeHoveredCategoryInfo ? activeHoveredCategoryInfo.name : 'Total' }}
-              </span>
-              <div class="text-xl font-bold text-[#f1f0f5] tabular-nums tracking-tight mt-0.5">
-                {{ currencySymbol }}{{ formatAmount(activeHoveredCategoryInfo ? activeHoveredCategoryInfo.amount : totalFilteredCategoryExpense) }}
-              </div>
-              <span v-if="activeHoveredCategoryInfo" class="text-[10px] font-semibold text-[#B3F5E1] mt-0.5">
-                {{ activeHoveredCategoryInfo.percentage }}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Hairline Divided Legend List -->
-        <TransitionGroup 
-          name="flip-list" 
-          tag="div" 
-          class="border-y border-[#1f202e] divide-y divide-[#1f202e]"
-        >
-          <div 
-            v-for="item in activeDashboardLegendItems"
-            :key="item.name"
-            @mouseenter="hoveredCategoryIndex = item.originalIndex"
-            @mouseleave="hoveredCategoryIndex = null"
-            @click="toggleSelectCategory(item.originalIndex)"
-            class="flex items-center justify-between py-2.5 px-1 transition cursor-pointer hover:bg-[#141520] active:bg-[#141520]"
-            :class="activeDashboardIndex === item.originalIndex ? 'bg-[#141520]' : ''"
-          >
-            <!-- Left: Color Indicator Dot + Category Name -->
-            <div class="flex items-center gap-2.5 min-w-0">
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: item.color }"></span>
-              <span class="text-xs font-semibold text-[#f1f0f5] truncate">{{ item.name }}</span>
-            </div>
-
-            <!-- Right: Percentage + Amount -->
-            <div class="flex items-center gap-4 shrink-0 tabular-nums">
-              <span class="text-[11px] text-[#9e9cae] font-medium w-10 text-right">{{ item.percentage }}%</span>
-              <span class="text-xs font-bold text-[#f1f0f5] text-right min-w-[70px]">
-                {{ currencySymbol }}{{ formatAmount(item.amount) }}
-              </span>
-            </div>
-          </div>
-        </TransitionGroup>
-      </div>
+      <InteractiveDonutChart
+        v-else
+        :groups="filteredCategoryExpenses"
+        :total="totalFilteredCategoryExpense"
+        :currency-symbol="currencySymbol"
+        id-prefix="dashboard"
+      />
     </section>
 
     <!-- 4. STORAGE ACCOUNTS BREAKDOWN (Staggered Entrance) -->
@@ -286,12 +140,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { resolveIcon } from '../utils/iconResolver.js';
 import { currencySymbol } from '../utils/currency.js';
 import { sortAccountsByOrder } from '../utils/accountSorter.js';
+import { isInternalAllocation } from '../utils/transactionSemantics.js';
 import BlackHoleCanvas from './BlackHoleCanvas.vue';
 import AccountAdjustmentModal from './AccountAdjustmentModal.vue';
+import InteractiveDonutChart from './InteractiveDonutChart.vue';
 
 const props = defineProps({
   transactions: {
@@ -418,10 +274,7 @@ const currentMonthTransactions = computed(() => {
 const filteredCategoryExpenses = computed(() => {
   const map = {};
   currentMonthTransactions.value.forEach(t => {
-    if (t.account_id === 'acc_unallocated_funds') {
-      const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-      if (!isSalaryAlloc) return;
-    }
+    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments' || t.category?.name === 'Adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
 
@@ -451,10 +304,7 @@ const totalFilteredCategoryExpense = totalExpenses;
 const filteredCategoryIncome = computed(() => {
   const map = {};
   currentMonthTransactions.value.forEach(t => {
-    if (t.account_id === 'acc_unallocated_funds') {
-      const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-      if (!isSalaryAlloc) return;
-    }
+    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments' || t.category?.name === 'Adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
 
@@ -519,145 +369,6 @@ const activeBuckets = computed(() => props.buckets.filter(bucket => {
   return Number.isFinite(Number(bucket.allocated_balance));
 }));
 
-const hoveredCategoryIndex = ref(null);
-const selectedCategoryIndex = ref(null);
-
-const activeDashboardIndex = computed(() => {
-  return selectedCategoryIndex.value !== null ? selectedCategoryIndex.value : hoveredCategoryIndex.value;
-});
-
-const toggleSelectCategory = (idx) => {
-  if (selectedCategoryIndex.value === idx) {
-    selectedCategoryIndex.value = null;
-    hoveredCategoryIndex.value = null;
-  } else {
-    selectedCategoryIndex.value = idx;
-    hoveredCategoryIndex.value = idx;
-  }
-};
-
-const activeHoveredCategoryInfo = computed(() => {
-  const currentIdx = activeDashboardIndex.value;
-  if (currentIdx !== null && dashboardPiePaths.value[currentIdx]) {
-    return dashboardPiePaths.value[currentIdx];
-  }
-  return null;
-});
-
-const currentOrbitAngle = ref(0);
-let animFrameId = null;
-let lastTimestamp = 0;
-
-const animateOrbit = (timestamp) => {
-  if (activeDashboardIndex.value === null) {
-    if (lastTimestamp) {
-      const dt = timestamp - lastTimestamp;
-      currentOrbitAngle.value = (currentOrbitAngle.value + dt * 0.0048) % 360;
-    }
-    lastTimestamp = timestamp;
-    animFrameId = requestAnimationFrame(animateOrbit);
-  } else {
-    lastTimestamp = 0;
-  }
-};
-
-onMounted(() => {
-  animFrameId = requestAnimationFrame(animateOrbit);
-  window.addEventListener('cashbuddy-settings-updated', updateHideUnallocated);
-});
-
-onUnmounted(() => {
-  if (animFrameId) cancelAnimationFrame(animFrameId);
-  window.removeEventListener('cashbuddy-settings-updated', updateHideUnallocated);
-});
-
-watch(activeDashboardIndex, (newVal) => {
-  if (newVal === null) {
-    lastTimestamp = 0;
-    animFrameId = requestAnimationFrame(animateOrbit);
-  } else {
-    if (animFrameId) cancelAnimationFrame(animFrameId);
-  }
-});
-
-const chartRotationTransform = computed(() => {
-  const currentIdx = activeDashboardIndex.value;
-  if (currentIdx === null) {
-    return `rotate(${currentOrbitAngle.value}deg)`;
-  }
-  const segment = dashboardPiePaths.value.find(s => s.originalIndex === currentIdx);
-  if (!segment || segment.midAngle === undefined) return `rotate(${currentOrbitAngle.value}deg)`;
-  
-  const midAngleDeg = (segment.midAngle * 180) / Math.PI;
-  const rawSnapRot = -90 - midAngleDeg;
-  
-  const baseOrbit = currentOrbitAngle.value;
-  const k = Math.round((baseOrbit - rawSnapRot) / 360);
-  const targetRot = rawSnapRot + k * 360;
-  
-  return `rotate(${targetRot}deg)`;
-});
-
-const dashboardPiePaths = computed(() => {
-  const total = totalFilteredCategoryExpense.value;
-  if (!total || filteredCategoryExpenses.value.length === 0) return [];
-
-  const cx = 100;
-  const cy = 100;
-  const outerR = 103;
-  const innerR = 89;
-  const hitOuterR = 118;
-  const hitInnerR = 74;
-
-  let currentAngle = -Math.PI / 2;
-
-  return filteredCategoryExpenses.value.map((item, idx) => {
-    const fraction = item.total / total;
-    const angleSpan = fraction * 2 * Math.PI;
-    const startAngle = currentAngle;
-    const endAngle = currentAngle + angleSpan;
-    const midAngle = startAngle + angleSpan / 2;
-    const percentage = Math.round((item.total / total) * 100);
-    currentAngle = endAngle;
-
-    const createArcPath = (oR, iR) => {
-      const x1o = cx + oR * Math.cos(startAngle);
-      const y1o = cy + oR * Math.sin(startAngle);
-      const x2o = cx + oR * Math.cos(endAngle);
-      const y2o = cy + oR * Math.sin(endAngle);
-
-      const x1i = cx + iR * Math.cos(startAngle);
-      const y1i = cy + iR * Math.sin(startAngle);
-      const x2i = cx + iR * Math.cos(endAngle);
-      const y2i = cy + iR * Math.sin(endAngle);
-
-      const largeArc = angleSpan > Math.PI ? 1 : 0;
-
-      return [
-        `M ${x1o} ${y1o}`,
-        `A ${oR} ${oR} 0 ${largeArc} 1 ${x2o} ${y2o}`,
-        `L ${x2i} ${y2i}`,
-        `A ${iR} ${iR} 0 ${largeArc} 0 ${x1i} ${y1i}`,
-        'Z'
-      ].join(' ');
-    };
-
-    return {
-      ...item,
-      amount: item.total,
-      percentage,
-      midAngle,
-      d: createArcPath(outerR, innerR),
-      hitD: createArcPath(hitOuterR, hitInnerR),
-      originalIndex: idx
-    };
-  });
-});
-
-const activeDashboardLegendItems = computed(() => {
-  return dashboardPiePaths.value;
-});
-
 const formatAmount = (val) => {
   const num = Number(val);
   return isNaN(num) ? '0.00' : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -669,46 +380,6 @@ const formatAmount = (val) => {
 .flip-list-enter-active,
 .flip-list-leave-active {
   transition: transform 0.22s var(--ease-out), opacity 0.22s var(--ease-out);
-}
-
-@keyframes slowOrbit {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes orbitCW {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes orbitCCW {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-
-@keyframes particlePulse {
-  0%, 100% { opacity: 0.25; transform: scale(0.85); }
-  50% { opacity: 0.95; transform: scale(1.35); }
-}
-
-.animate-slow-orbit {
-  animation: slowOrbit 75s linear infinite;
-}
-
-.animate-orbit-1 { animation: orbitCW 24s linear infinite; transform-origin: 100px 100px; }
-.animate-orbit-2 { animation: orbitCCW 36s linear infinite; transform-origin: 100px 100px; }
-.animate-orbit-3 { animation: orbitCW 48s linear infinite; transform-origin: 100px 100px; }
-.animate-orbit-4 { animation: orbitCCW 28s linear infinite; transform-origin: 100px 100px; }
-.animate-orbit-5 { animation: orbitCW 42s linear infinite; transform-origin: 100px 100px; }
-.animate-orbit-6 { animation: orbitCCW 56s linear infinite; transform-origin: 100px 100px; }
-
-.particle-dot {
-  animation: particlePulse 3s ease-in-out infinite;
-  transform-origin: center;
 }
 
 @keyframes cascadeIn {

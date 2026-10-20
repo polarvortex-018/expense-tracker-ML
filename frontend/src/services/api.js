@@ -26,6 +26,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { applyTheme } from '../utils/theme.js';
+import { isInternalAllocation } from '../utils/transactionSemantics.js';
 
 function uint8ToBase64(uint8) {
   let binary = '';
@@ -193,41 +194,68 @@ export const api = {
     }));
   },
 
-  async getExpenseQuestionTransactions({ startDate, endDate, items = [] } = {}) {
+  async getQuestionTransactions({ startDate, endDate, dateRanges = [], items = [], flow = 'expense', accountIds = [], bucketIds = [] } = {}) {
     await ensureDB();
 
-    const clauses = ["t.transaction_type = 'expense'"];
-    const sqlParams = [];
-
-    if (startDate) {
-      clauses.push('t.date >= ?');
-      sqlParams.push(startDate);
-    }
-    if (endDate) {
-      clauses.push('t.date <= ?');
-      sqlParams.push(endDate);
-    }
-
     const itemPredicates = [];
+    const itemParams = [];
+    const transferPredicates = [];
+    const transferParams = [];
     const safeItems = Array.isArray(items) ? items : [];
     for (const item of safeItems) {
       if (item?.kind === 'category' && typeof item.id === 'string' && item.id.length > 0) {
-        itemPredicates.push('t.category_id = ?');
-        sqlParams.push(item.id);
+        itemPredicates.push(flow === 'outgoing'
+          ? "(t.category_id = ? OR INSTR(LOWER(COALESCE(t.description, '')), LOWER(?)) > 0)"
+          : 't.category_id = ?');
+        itemParams.push(item.id);
+        if (flow === 'outgoing' && item.name) itemParams.push(item.name);
+        if (item.name) {
+          transferPredicates.push("(INSTR(LOWER(COALESCE(t.description, '')), LOWER(?)) > 0 OR INSTR(LOWER(COALESCE(b.name, '')), LOWER(?)) > 0)");
+          transferParams.push(item.name, item.name);
+        }
       } else if (item?.kind === 'description' && typeof item.text === 'string' && item.text.trim().length > 0) {
         itemPredicates.push("INSTR(LOWER(COALESCE(t.description, '')), LOWER(?)) > 0");
-        sqlParams.push(item.text.trim());
+        itemParams.push(item.text.trim());
+        transferPredicates.push("(INSTR(LOWER(COALESCE(t.description, '')), LOWER(?)) > 0 OR INSTR(LOWER(COALESCE(b.name, '')), LOWER(?)) > 0)");
+        transferParams.push(item.text.trim(), item.text.trim());
       }
     }
-    if (itemPredicates.length) clauses.push(`(${itemPredicates.join(' OR ')})`);
+    const ranges = dateRanges.length ? dateRanges : startDate || endDate ? [{ startDate, endDate }] : [];
+    const dateFilter = ranges.length
+      ? ` AND (${ranges.map(() => '(t.date >= ? AND t.date <= ?)').join(' OR ')})`
+      : '';
+    const dateParams = ranges.flatMap((range) => [range.startDate, range.endDate]);
+    const safeAccountIds = Array.isArray(accountIds) ? accountIds.filter(Boolean) : [];
+    const safeBucketIds = Array.isArray(bucketIds) ? bucketIds.filter(Boolean) : [];
+    const accountFilter = safeAccountIds.length ? ` AND t.account_id IN (${safeAccountIds.map(() => '?').join(', ')})` : '';
+    const bucketFilter = safeBucketIds.length ? ` AND t.bucket_id IN (${safeBucketIds.map(() => '?').join(', ')})` : '';
+    const itemFilter = itemPredicates.length ? ` AND (${itemPredicates.join(' OR ')})` : '';
+    const allocationFilter = ` AND LOWER(COALESCE(t.description, '')) NOT LIKE 'salary allocation%' AND LOWER(COALESCE(t.description, '')) NOT LIKE 'reallocated to %'`;
+    let flowFilter;
+    if (flow === 'income') {
+      flowFilter = `t.transaction_type = 'income'${itemFilter}${allocationFilter}`;
+    } else if (flow === 'outgoing') {
+      const transferFilter = transferPredicates.length ? ` AND (${transferPredicates.join(' OR ')})` : '';
+      flowFilter = `((t.transaction_type = 'expense'${itemFilter} AND NOT (t.account_id = 'acc_unallocated_funds' AND t.category_id IS NULL)) OR (t.transaction_type = 'transfer' AND t.adjustment_direction = 'subtract'${transferFilter}))${allocationFilter}`;
+    } else {
+      flowFilter = `t.transaction_type = 'expense'${itemFilter} AND NOT (t.account_id = 'acc_unallocated_funds' AND t.category_id IS NULL)${allocationFilter}`;
+    }
+    const sqlParams = flow === 'outgoing'
+      ? [...itemParams, ...transferParams, ...dateParams, ...safeAccountIds, ...safeBucketIds]
+      : [...itemParams, ...dateParams, ...safeAccountIds, ...safeBucketIds];
 
     return execQuery(`
-      SELECT t.id, t.amount, t.description, t.date, t.category_id,
-        c.name AS category_name, c.color AS category_color
+      SELECT t.id, t.amount, t.description, t.date, t.category_id, t.transaction_type, t.adjustment_direction,
+        t.account_id, t.bucket_id,
+        a.name AS account_name,
+        c.name AS category_name, c.color AS category_color, c.icon AS category_icon,
+        b.name AS bucket_name, b.icon AS bucket_icon, b.color AS bucket_color
       FROM transactions t
+      LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN categories c ON t.category_id = c.id
-      WHERE ${clauses.join(' AND ')}
-      ORDER BY t.date ASC, t.id ASC
+      LEFT JOIN savings_buckets b ON t.bucket_id = b.id
+      WHERE ${flowFilter}${dateFilter}${accountFilter}${bucketFilter}
+      ORDER BY t.date DESC, t.id DESC
     `, sqlParams);
   },
 
@@ -240,12 +268,10 @@ export const api = {
     const categoryTotalsMap = {};
 
     txs.forEach(t => {
-      // Internal account transfers & Unallocated Funds transactions must NEVER be included in income or expense totals EXCEPT Salary Allocations
+      // Allocations and transfers move existing money; they are not new income or spending.
+      if (isInternalAllocation(t)) return;
       if (t.transaction_type === 'transfer') return;
-      if (t.account_id === 'acc_unallocated_funds') {
-        const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-        if (!isSalaryAlloc) return;
-      }
+      if (t.account_id === 'acc_unallocated_funds') return;
 
       const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments' || t.category?.name === 'Adjustments';
       if (isAdjustment && Number(t.include_in_chart) !== 1) return;
@@ -878,14 +904,14 @@ export const api = {
           execRun('UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?', [rounded, now, targetAccountId], false);
         }
 
-        // 3. Log income transaction for bucket allocation so it reflects as bucket income
+        // 3. Log the allocation as a transfer; the original salary was already recorded as income.
         const txId = generateUUID();
         const bObj = targetBucketId ? execQuery('SELECT name FROM savings_buckets WHERE id = ?', [targetBucketId])[0] : null;
         const allocDesc = bObj ? `Salary Allocation → ${bObj.name}` : desc;
         execRun(
           `INSERT INTO transactions (id, amount, transaction_type, adjustment_direction, description, date, account_id, bucket_id, category_id, created_at, updated_at, include_in_chart)
-           VALUES (?, ?, 'income', 'add', ?, ?, ?, ?, ?, ?, ?, 1)`,
-          [txId, rounded, allocDesc, today, targetAccountId || actualSourceAccountId, targetBucketId, rule.category_id || null, now, now],
+           VALUES (?, ?, 'transfer', 'add', ?, ?, ?, ?, NULL, ?, ?, 0)`,
+          [txId, rounded, allocDesc, today, targetAccountId || actualSourceAccountId, targetBucketId, now, now],
           false
         );
 
@@ -979,8 +1005,8 @@ export const api = {
       const txId = generateUUID();
       execRun(
         `INSERT INTO transactions (id, amount, transaction_type, adjustment_direction, description, date, account_id, bucket_id, category_id, created_at, updated_at, include_in_chart)
-         VALUES (?, ?, 'income', NULL, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [txId, allocation, desc, today, accountId, bucketId, categoryId, now, now],
+         VALUES (?, ?, 'transfer', 'add', ?, ?, ?, ?, NULL, ?, ?, 0)`,
+        [txId, allocation, desc, today, accountId, bucketId, now, now],
         false
       );
 

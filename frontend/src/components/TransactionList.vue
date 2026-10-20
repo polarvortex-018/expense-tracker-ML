@@ -1369,6 +1369,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import CategoryPicker from './CategoryPicker.vue';
 import { resolveIcon } from '../utils/iconResolver.js';
 import { currencySymbol } from '../utils/currency.js';
+import { isInternalAllocation } from '../utils/transactionSemantics.js';
 
 const props = defineProps({
   transactions: {
@@ -1821,11 +1822,8 @@ const groupedTransactionsByDate = computed(() => {
     }
     groups[rawDate].transactions.push(t);
 
-    // Unallocated Funds deposits/adjustments must NEVER count toward daily summary headers EXCEPT Salary Allocations
-    if (t.account_id === 'acc_unallocated_funds') {
-      const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-      if (!isSalaryAlloc) return;
-    }
+    // Internal allocation movements appear in history but are not income or spending.
+    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
 
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
@@ -1862,10 +1860,7 @@ const formatDateHeader = (dateStr) => {
 const filteredCategoryExpenses = computed(() => {
   const map = {};
   allPeriodTransactions.value.forEach(t => {
-    if (t.account_id === 'acc_unallocated_funds') {
-      const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-      if (!isSalaryAlloc) return;
-    }
+    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
 
@@ -1892,10 +1887,7 @@ const totalFilteredCategoryExpense = computed(() => {
 const filteredCategoryIncome = computed(() => {
   const map = {};
   allPeriodTransactions.value.forEach(t => {
-    if (t.account_id === 'acc_unallocated_funds') {
-      const isSalaryAlloc = Boolean(t.bucket_id) && (t.transaction_type === 'income' || (t.description && t.description.includes('Salary Allocation')));
-      if (!isSalaryAlloc) return;
-    }
+    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
 

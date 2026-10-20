@@ -132,6 +132,7 @@
 import { computed, ref, watch } from 'vue';
 import { api } from '../services/api.js';
 import { currencySymbol } from '../utils/currency.js';
+import { isInternalAllocation } from '../utils/transactionSemantics.js';
 
 const props = defineProps({
   categories: { type: Array, default: () => [] },
@@ -266,11 +267,10 @@ function setMode(value) {
 }
 
 function isInternal(tx) {
-  const description = String(tx.description || '').trim().toLowerCase();
   return tx.transaction_type === 'transfer'
     || tx.transaction_type === 'adjustment'
     || tx.account_id === 'acc_unallocated_funds'
-    || description.startsWith('salary allocation');
+    || isInternalAllocation(tx);
 }
 
 function isExcluded(tx) {

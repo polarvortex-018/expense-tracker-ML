@@ -8,14 +8,21 @@ This document tracks the complete versioning roadmap for Cash Buddy, mapped dire
 
 ---
 
-## Current Version: **`v0.07.12`**
+## Current Version: **`v0.07.13`**
 
 ---
 
 ## Version History Log
 
 ### **v0.07 — Reports & Spending Insights**
-- **`v0.07.12`** *(Current)*
+- **`v0.07.13`** *(Current)*
+  - Added **Cash Buddy**, a fully local natural-language question tool in Settings, with help search for app questions and a guide to supported query types.
+  - Expanded the parser for expense and income totals, money sent home, category/account/bucket and description matching, transaction counts, rankings, averages, recurring expenses, recent spending amounts, daily spending guidance, and multiple non-contiguous date ranges.
+  - Made question matching use the active vault’s categories, accounts, and buckets; added fuzzy name correction with clarification when a name could refer to more than one item.
+  - Added interactive answer results with animated totals, colored donut charts, plain-English summaries, date and bucket selectors, category comparisons across months, and matching transactions grouped by day. Excluded salary allocations and internal pool movements from spending totals.
+  - Improved mobile results with a question-help guide, incremental transaction loading, a visible Back to questions button, Android safe-area spacing, and Android Back handling that closes the answer first.
+  - Removed an artificial query-loading delay and rebuilt the local Android debug APK.
+- **`v0.07.12`**
   - Split categories into expense and income types, defaulted existing and newly created categories to expense, added type selection when creating or editing categories, filtered transaction quick-select and picker options by transaction type, and added category creation directly from the transaction picker.
 - **`v0.07.11`**
   - Replaced the adaptive-icon splash resource with the transparent high-resolution logo drawable directly; removed the wrapper after the splash continued to display as a square. Clean Android debug APK build succeeded.
