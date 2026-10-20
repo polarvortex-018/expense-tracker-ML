@@ -193,6 +193,44 @@ export const api = {
     }));
   },
 
+  async getExpenseQuestionTransactions({ startDate, endDate, items = [] } = {}) {
+    await ensureDB();
+
+    const clauses = ["t.transaction_type = 'expense'"];
+    const sqlParams = [];
+
+    if (startDate) {
+      clauses.push('t.date >= ?');
+      sqlParams.push(startDate);
+    }
+    if (endDate) {
+      clauses.push('t.date <= ?');
+      sqlParams.push(endDate);
+    }
+
+    const itemPredicates = [];
+    const safeItems = Array.isArray(items) ? items : [];
+    for (const item of safeItems) {
+      if (item?.kind === 'category' && typeof item.id === 'string' && item.id.length > 0) {
+        itemPredicates.push('t.category_id = ?');
+        sqlParams.push(item.id);
+      } else if (item?.kind === 'description' && typeof item.text === 'string' && item.text.trim().length > 0) {
+        itemPredicates.push("INSTR(LOWER(COALESCE(t.description, '')), LOWER(?)) > 0");
+        sqlParams.push(item.text.trim());
+      }
+    }
+    if (itemPredicates.length) clauses.push(`(${itemPredicates.join(' OR ')})`);
+
+    return execQuery(`
+      SELECT t.id, t.amount, t.description, t.date, t.category_id,
+        c.name AS category_name, c.color AS category_color
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY t.date ASC, t.id ASC
+    `, sqlParams);
+  },
+
   async getTransactionSummary(params = {}) {
     await ensureDB();
     const txs = await this.getTransactions(params);
