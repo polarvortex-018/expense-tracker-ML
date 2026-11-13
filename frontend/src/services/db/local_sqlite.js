@@ -315,6 +315,7 @@ function runSchemaAndSeeds() {
     const columns = execQuery(`PRAGMA table_info(${table})`).map(row => row.name);
     if (!columns.includes(column)) db.run(sql);
   }
+  migrateCalculatorSnapshots();
   db.run('CREATE INDEX IF NOT EXISTS ix_transactions_date ON transactions(date)');
   db.run('CREATE INDEX IF NOT EXISTS ix_transactions_type ON transactions(transaction_type)');
   db.run('CREATE INDEX IF NOT EXISTS ix_transactions_account ON transactions(account_id)');
@@ -384,6 +385,71 @@ function runSchemaAndSeeds() {
   }
 
   db.run("INSERT OR REPLACE INTO app_metadata(key,value) VALUES ('schema_version','3')");
+}
+
+function parseSnapshotJson(value) {
+  if (value && typeof value === 'object') return value;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeLegacySnapshot(row) {
+  const parsed = parseSnapshotJson(row.snapshot_json) || parseSnapshotJson(row.payload) || {};
+  const resultValue = parsed.result ?? row.result;
+  const result = Number.isFinite(Number(resultValue)) ? Number(resultValue) : 0;
+  const terms = Array.isArray(parsed.terms) && parsed.terms.length
+    ? parsed.terms
+    : [{ id: generateUUID(), value: String(result), label: '', icon: 'calculate', operator: null }];
+  const buckets = Array.isArray(parsed.buckets) ? parsed.buckets : [];
+  const manualValue = parsed.manualStartingAmount ?? row.manual_starting_amount ?? row.starting_balance ?? 0;
+  const manualStartingAmount = Number.isFinite(Number(manualValue)) ? Number(manualValue) : 0;
+  const payload = { ...parsed, terms, buckets, manualStartingAmount, result };
+  const legacyName = String(row.name || '').trim();
+  const title = String(row.title || '').trim();
+  const name = (!legacyName || legacyName === 'Saved plan') && title ? title : (legacyName || title || 'Saved plan');
+
+  return {
+    id: String(row.id || generateUUID()),
+    name: name.slice(0, 100),
+    payload: JSON.stringify(payload),
+    created_at: String(row.created_at || new Date().toISOString()),
+    updated_at: String(row.updated_at || row.created_at || new Date().toISOString())
+  };
+}
+
+function migrateCalculatorSnapshots() {
+  const expectedColumns = ['id', 'name', 'payload', 'created_at', 'updated_at'];
+  const info = execQuery('PRAGMA table_info(calculator_snapshots)');
+  const columns = info.map((column) => column.name);
+  const isCanonical = columns.length === expectedColumns.length && expectedColumns.every((column) => columns.includes(column));
+  if (isCanonical) return;
+
+  const legacyRows = execQuery('SELECT * FROM calculator_snapshots');
+  const normalizedRows = legacyRows.map(normalizeLegacySnapshot);
+  db.run('BEGIN TRANSACTION');
+  try {
+    db.run(`CREATE TABLE calculator_snapshots_canonical (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    for (const row of normalizedRows) {
+      db.run('INSERT INTO calculator_snapshots_canonical (id, name, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [row.id, row.name, row.payload, row.created_at, row.updated_at]);
+    }
+    db.run('DROP TABLE calculator_snapshots');
+    db.run('ALTER TABLE calculator_snapshots_canonical RENAME TO calculator_snapshots');
+    db.run('COMMIT');
+  } catch (error) {
+    db.run('ROLLBACK');
+    throw new Error(`Could not migrate calculator snapshots: ${error.message}`);
+  }
 }
 
 export function ensureTransactionsAccountIdNullable() {

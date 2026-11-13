@@ -170,6 +170,15 @@
           </button>
         </div>
 
+        <!-- Calculator -->
+        <div class="border-t border-[#1f202e]">
+          <button type="button" @click="activeSheet = 'calculator'" class="w-full p-3.5 hover:bg-[#141520] transition duration-150 cursor-pointer text-left flex items-center gap-2.5 group active:bg-[#191924]">
+            <div class="w-8.5 h-8.5 rounded-xl bg-[#B3F5E1]/10 border border-[#B3F5E1]/20 text-[#B3F5E1] flex items-center justify-center shrink-0 group-hover:scale-105 transition"><span class="material-symbols-outlined text-base">calculate</span></div>
+            <div class="min-w-0 flex-1"><h3 class="text-xs font-bold text-[#f1f0f5] group-hover:text-[#B3F5E1] transition leading-tight">Calculator</h3><p class="text-[10px] text-[#9e9cae] mt-0.5 leading-tight">Plan amounts and save snapshots locally</p></div>
+            <span class="material-symbols-outlined text-[#9e9cae] text-sm group-hover:text-[#f1f0f5] transition">chevron_right</span>
+          </button>
+        </div>
+
         <!-- Row 5: App Theme & Appearance -->
         <div class="border-t border-[#1f202e]">
           <button 
@@ -228,6 +237,8 @@
             :buckets="buckets"
             :active-vault="activeVault"
           />
+
+          <CalculatorView v-if="activeSheet === 'calculator'" ref="calculatorViewRef" :buckets="buckets" :active-vault="activeVault" />
 
           <!-- 1. QUICK ACTIONS PAGE -->
           <div v-if="activeSheet === 'quick_actions'" class="space-y-6">
@@ -1785,12 +1796,14 @@ import { sortAccountsByOrder, saveAccountOrder } from '../utils/accountSorter.js
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import ReportsView from './ReportsView.vue';
 import AskCashBuddy from './AskCashBuddy.vue';
+import CalculatorView from './CalculatorView.vue';
 
 const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
 const showThemeModal = ref(false);
 const activeSheet = ref(null); // null or the selected settings page
 const reportsViewRef = ref(null);
+const calculatorViewRef = ref(null);
 const unassignedAuditLogs = ref([]);
 const auditDateFilter = ref('all');
 const customAuditMonth = ref('');
@@ -1902,6 +1915,7 @@ const getSheetIcon = (sheet) => {
     case 'unassigned_audit': return 'history_edu';
     case 'currency': return 'payments';
     case 'reports': return 'summarize';
+    case 'calculator': return 'calculate';
     default: return 'widgets';
   }
 };
@@ -1918,6 +1932,7 @@ const getSheetTitle = (sheet) => {
     case 'unassigned_audit': return 'Balance Adjustments & Audit Log';
     case 'currency': return 'Currency & Formatting';
     case 'reports': return 'Reports';
+    case 'calculator': return 'Calculator';
     default: return 'More';
   }
 };
@@ -1963,6 +1978,7 @@ defineExpose({
     activeSheet.value = 'faq';
   },
   closeActiveSheet: () => {
+    if (activeSheet.value === 'calculator' && calculatorViewRef.value?.closeActiveDialog()) return;
     if (activeSheet.value === 'reports' && reportsViewRef.value?.closeDrilldown()) return;
     activeSheet.value = null;
   }

@@ -8,14 +8,27 @@ This document tracks the complete versioning roadmap for Cash Buddy, mapped dire
 
 ---
 
-## Current Version: **`v0.07.13`**
+## Current Version: **`v0.08.02`**
 
 ---
 
 ## Version History Log
 
+### **v0.08 — Local Planning Tools**
+- **`v0.08.02`** *(Current)*
+  - Migrated legacy calculator snapshot tables to a canonical local schema, preserving saved titles and JSON while removing obsolete required columns that blocked new saves.
+  - Made bucket selection immediately update the available-after-plan amount, compacted included-bucket markers, and moved the calculator icon picker into a mobile-safe overlay.
+- **`v0.08.01`**
+  - Refined the calculator’s savings bucket dial for mobile: portaled it to the document body, bounded it to the viewport, kept its contents scrollable and its Done action fixed, and made Android Back dismiss the dial before leaving the calculator.
+  - Re-synced Capacitor Android assets and assembled the debug APK.
+- **`v0.08.00`**
+  - Added a local calculator under More → Calculator with arithmetic precedence, keyboard and keypad input, one-step undo, editable amount labels and icons, scratchpad starting balances, and signed available-after-plan totals.
+  - Added a rotating, swipeable savings bucket dial that captures active bucket balances without changing financial records.
+  - Added named calculator snapshots in the active vault’s SQLite database; snapshots include expression terms, labels, icons, starting balances, and result, and restore as editable copies.
+  - Kept Ask Cash Buddy on the More/Settings hub.
+
 ### **v0.07 — Reports & Spending Insights**
-- **`v0.07.13`** *(Current)*
+- **`v0.07.13`**
   - Added **Cash Buddy**, a fully local natural-language question tool in Settings, with help search for app questions and a guide to supported query types.
   - Expanded the parser for expense and income totals, money sent home, category/account/bucket and description matching, transaction counts, rankings, averages, recurring expenses, recent spending amounts, daily spending guidance, and multiple non-contiguous date ranges.
   - Made question matching use the active vault’s categories, accounts, and buckets; added fuzzy name correction with clarification when a name could refer to more than one item.

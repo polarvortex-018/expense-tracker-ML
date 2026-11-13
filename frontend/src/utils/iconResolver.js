@@ -13,6 +13,7 @@ export const ICON_CATALOG = [
       { id: 'paid', label: 'Paid' },
       { id: 'currency_rupee', label: 'Rupee' },
       { id: 'account_balance_wallet', label: 'Cash Wallet' },
+      { id: 'calculate', label: 'Calculator' },
     ]
   },
   {

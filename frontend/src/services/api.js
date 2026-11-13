@@ -1385,6 +1385,41 @@ export const api = {
 
   async checkIntegrity() { await ensureDB(); return checkDatabaseIntegrity(); },
 
+  async getCalculatorSnapshots() {
+    await ensureDB();
+    return execQuery('SELECT id, name, payload, created_at, updated_at FROM calculator_snapshots ORDER BY created_at DESC, rowid DESC')
+      .map((row) => {
+        try { return { ...row, payload: JSON.parse(row.payload) } } catch { return null }
+      })
+      .filter(Boolean);
+  },
+
+  async saveCalculatorSnapshot({ name, payload }) {
+    await ensureDB();
+    const cleanName = String(name || '').trim();
+    if (!cleanName || cleanName.length > 100) throw new Error('Give this snapshot a name under 100 characters.');
+    if (!payload || !Array.isArray(payload.terms) || payload.terms.length > 500 || !Array.isArray(payload.buckets)) throw new Error('This calculator snapshot is invalid.');
+    if (!Number.isFinite(Number(payload.result)) || !Number.isFinite(Number(payload.manualStartingAmount || 0))) throw new Error('The snapshot needs a valid result and starting amount.');
+    if (payload.terms.some((term, index) => !term || !Number.isFinite(Number(term.value)) || String(term.label || '').length > 120 || String(term.icon || '').length > 80 || (index < payload.terms.length - 1 && !['+', '-', '*', '/'].includes(term.operator)) || (index === payload.terms.length - 1 && term.operator))) throw new Error('This snapshot contains an invalid amount or operator.');
+    if (payload.buckets.some((bucket) => !bucket || !String(bucket.id || '').trim() || !String(bucket.name || '').trim() || !Number.isFinite(Number(bucket.balance)))) throw new Error('This snapshot contains an invalid bucket balance.');
+    const json = JSON.stringify(payload);
+    if (json.length > 100000) throw new Error('This snapshot is too large to save.');
+    const now = new Date().toISOString();
+    const snapshot = { id: generateUUID(), name: cleanName, payload: JSON.parse(json), created_at: now, updated_at: now };
+    await runInTransaction(async () => {
+      execRun('INSERT INTO calculator_snapshots (id, name, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [snapshot.id, snapshot.name, json, now, now], false);
+    });
+    return snapshot;
+  },
+
+  async deleteCalculatorSnapshot(id) {
+    await ensureDB();
+    await runInTransaction(async () => {
+      execRun('DELETE FROM calculator_snapshots WHERE id = ?', [String(id)], false);
+    });
+    return true;
+  },
+
   // ----------------------------------------------------
   // ONBOARDING & TUTORIAL STATE (PER VAULT)
   // ----------------------------------------------------

@@ -97,6 +97,14 @@ CREATE TABLE IF NOT EXISTS vault_settings (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS calculator_snapshots (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 `;
 
 export const DEFAULT_CATEGORIES = [
