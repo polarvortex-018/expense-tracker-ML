@@ -1369,7 +1369,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import CategoryPicker from './CategoryPicker.vue';
 import { resolveIcon } from '../utils/iconResolver.js';
 import { currencySymbol } from '../utils/currency.js';
-import { isInternalAllocation } from '../utils/transactionSemantics.js';
+import { isInternalAllocation, isSalaryAllocation } from '../utils/transactionSemantics.js';
 
 const props = defineProps({
   transactions: {
@@ -1779,7 +1779,9 @@ const isMatchingTransaction = (t) => {
   }
 
   // 6. Type Filter
-  if (filters.value.transaction_type && t.transaction_type !== filters.value.transaction_type) {
+  if (filters.value.transaction_type === 'income') {
+    if (t.transaction_type !== 'income' && !isSalaryAllocation(t)) return false;
+  } else if (filters.value.transaction_type && t.transaction_type !== filters.value.transaction_type) {
     return false;
   }
 
@@ -1794,8 +1796,19 @@ const allPeriodTransactions = computed(() => {
 
 const displayedTransactions = computed(() => {
   let list = allPeriodTransactions.value;
+  if (chartViewMode.value === 'income') {
+    list = list.filter(t => t.transaction_type === 'income'
+      || (isSalaryAllocation(t) && t.adjustment_direction !== 'subtract')
+      || (t.transaction_type === 'adjustment' && t.adjustment_direction === 'add' && Number(t.include_in_chart) === 1));
+  } else if (chartViewMode.value === 'expense') {
+    list = list.filter(t => t.transaction_type === 'expense'
+      || (t.transaction_type === 'adjustment' && t.adjustment_direction === 'subtract' && Number(t.include_in_chart) === 1));
+  }
   if (selectedChartCategoryRecordId.value) {
-    list = list.filter(t => t.category_id === selectedChartCategoryRecordId.value);
+    const selectedId = selectedChartCategoryRecordId.value;
+    list = selectedId.startsWith('salary-bucket:')
+      ? list.filter(t => t.bucket_id === selectedId.slice('salary-bucket:'.length))
+      : list.filter(t => t.category_id === selectedId);
   }
 
   return [...list].sort((a, b) => {
@@ -1822,8 +1835,9 @@ const groupedTransactionsByDate = computed(() => {
     }
     groups[rawDate].transactions.push(t);
 
-    // Internal allocation movements appear in history but are not income or spending.
-    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
+    // Salary allocations are reported as income activity; other internal movements are excluded.
+    const salaryAllocation = isSalaryAllocation(t);
+    if ((isInternalAllocation(t) && !salaryAllocation) || (t.account_id === 'acc_unallocated_funds' && !salaryAllocation)) return;
 
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
@@ -1832,7 +1846,7 @@ const groupedTransactionsByDate = computed(() => {
     if (t.transaction_type === 'expense' || (isAdjustment && t.adjustment_direction === 'subtract')) {
       groups[rawDate].totalExpense += amt;
     }
-    if (t.transaction_type === 'income' || (isAdjustment && t.adjustment_direction === 'add')) {
+    if (t.transaction_type === 'income' || salaryAllocation || (isAdjustment && t.adjustment_direction === 'add')) {
       groups[rawDate].totalIncome += amt;
     }
   });
@@ -1887,16 +1901,17 @@ const totalFilteredCategoryExpense = computed(() => {
 const filteredCategoryIncome = computed(() => {
   const map = {};
   allPeriodTransactions.value.forEach(t => {
-    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
+    const salaryAllocation = isSalaryAllocation(t);
+    if ((isInternalAllocation(t) && !salaryAllocation) || (t.account_id === 'acc_unallocated_funds' && !salaryAllocation)) return;
     const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments';
     if (isAdjustment && Number(t.include_in_chart) !== 1) return;
 
-    if (t.transaction_type === 'income' || (isAdjustment && t.adjustment_direction === 'add')) {
-      const catId = t.category_id || 'cat_adjustments';
+    if (t.transaction_type === 'income' || salaryAllocation || (isAdjustment && t.adjustment_direction === 'add')) {
+      const catId = t.category_id || (salaryAllocation && t.bucket_id ? `salary-bucket:${t.bucket_id}` : 'cat_adjustments');
       const bName = t.bucket_id ? getBucketName(t.bucket_id) : null;
-      const catName = getCategoryName(catId) || bName || (isAdjustment ? 'Adjustments' : 'Uncategorized');
-      const catColor = getCategoryColor(catId) || (isAdjustment ? '#a855f7' : '#10b981');
-      const catIcon = getCategoryIcon(catId) || (isAdjustment ? 'tune' : 'category');
+      const catName = (salaryAllocation && !t.category_id ? bName : getCategoryName(catId)) || bName || (isAdjustment ? 'Adjustments' : 'Uncategorized');
+      const catColor = (salaryAllocation && !t.category_id && t.bucket_id ? getBucketColor(t.bucket_id) : getCategoryColor(catId)) || (isAdjustment ? '#a855f7' : '#10b981');
+      const catIcon = (salaryAllocation && !t.category_id && t.bucket_id ? getBucketIcon(t.bucket_id) : getCategoryIcon(catId)) || (isAdjustment ? 'tune' : 'category');
       const amt = Number(t.amount) || 0;
       if (!map[catName]) {
         map[catName] = { id: catId, name: catName, color: catColor, icon: catIcon, total: 0 };
@@ -2239,6 +2254,7 @@ const formatAmount = (val) => {
 };
 
 const transactionBadgeClass = (tx) => {
+  if (isSalaryAllocation(tx)) return 'bg-[#B3F5E1]/20 text-[#B3F5E1] border border-[#B3F5E1]/30';
   if (tx.transaction_type === 'income') return 'bg-[#B3F5E1]/20 text-[#B3F5E1] border border-[#B3F5E1]/30';
   if (tx.transaction_type === 'transfer') return 'bg-[#D4BFFF]/20 text-[#D4BFFF] border border-[#D4BFFF]/30';
   if (tx.transaction_type === 'adjustment') return 'bg-[#d2bbff]/20 text-[#d2bbff] border border-[#d2bbff]/30';
@@ -2246,6 +2262,7 @@ const transactionBadgeClass = (tx) => {
 };
 
 const transactionAmountClass = (tx) => {
+  if (isSalaryAllocation(tx)) return 'text-[#B3F5E1]';
   if (tx.transaction_type === 'income') return 'text-[#B3F5E1]';
   if (tx.transaction_type === 'transfer') return 'text-[#D4BFFF]';
   if (tx.transaction_type === 'adjustment') {
@@ -2257,6 +2274,7 @@ const transactionAmountClass = (tx) => {
 };
 
 const transactionSign = (tx) => {
+  if (isSalaryAllocation(tx)) return '+';
   if (tx.transaction_type === 'income') return '+';
   if (tx.transaction_type === 'transfer') {
     if (tx.adjustment_direction === 'add') return '+';
@@ -2272,6 +2290,7 @@ const transactionSign = (tx) => {
 };
 
 const transactionLabel = (tx) => {
+  if (isSalaryAllocation(tx)) return 'Income';
   if (tx.transaction_type === 'income') return 'Income';
   if (tx.transaction_type === 'transfer') return 'Transfer';
   if (tx.transaction_type === 'adjustment') return 'Adjustment';

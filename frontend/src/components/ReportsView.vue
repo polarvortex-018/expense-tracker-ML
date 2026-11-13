@@ -61,6 +61,19 @@
     <div v-else-if="error" class="rounded-xl border border-rose-400/30 bg-rose-950/30 p-4 text-sm text-rose-200">{{ error }}</div>
     <div v-else-if="loading" class="rounded-2xl border border-[#1f202e] bg-[#0f1019] p-8 text-center text-sm text-[#9e9cae]" aria-live="polite">Loading report…</div>
     <template v-else>
+      <section class="rounded-2xl border border-[#B3F5E1]/20 bg-[#B3F5E1]/5 p-4 sm:p-5">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <div><h3 class="text-sm font-bold text-[#f1f0f5]">Income activity</h3><p class="mt-1 text-xs text-[#9e9cae]">Recorded income and salary allocations</p></div>
+          <span class="material-symbols-outlined text-[#B3F5E1]">trending_up</span>
+        </div>
+        <p class="text-2xl font-bold tracking-tight text-[#B3F5E1] tabular-nums">{{ currencySymbol }}{{ formatAmount(incomeSummary.total) }}</p>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#9e9cae]">
+          <span>Recorded income {{ currencySymbol }}{{ formatAmount(incomeSummary.recordedIncome) }}</span>
+          <span>Salary allocations {{ currencySymbol }}{{ formatAmount(incomeSummary.salaryAllocations) }}</span>
+        </div>
+        <p v-if="mode === 'month'" class="mt-2 text-xs text-[#9e9cae]">Compared with {{ compareMonthLabel }}: {{ currencySymbol }}{{ formatAmount(previousIncomeSummary.total) }}</p>
+      </section>
+
       <div class="grid gap-3 sm:grid-cols-3">
         <article class="rounded-2xl border border-[#FFD1B3]/20 bg-[#FFD1B3]/5 p-4">
           <p class="text-xs text-[#9e9cae]">Total spent</p>
@@ -133,6 +146,7 @@ import { computed, ref, watch } from 'vue';
 import { api } from '../services/api.js';
 import { currencySymbol } from '../utils/currency.js';
 import { isInternalAllocation } from '../utils/transactionSemantics.js';
+import { calculateIncomeSummary } from '../utils/incomeSummary.js';
 
 const props = defineProps({
   categories: { type: Array, default: () => [] },
@@ -144,7 +158,7 @@ const SETTING_KEY = 'report_exclusions';
 const LEGACY_SETTING_KEY = 'report_exclusions_by_month';
 const mode = ref('month');
 const currentMonthKey = monthKey(new Date());
-const defaultMonthKey = shiftMonth(currentMonthKey, -1);
+const defaultMonthKey = currentMonthKey;
 const defaultCompareMonthKey = shiftMonth(defaultMonthKey, -1);
 const selectedMonth = ref(defaultMonthKey);
 const compareMonth = ref(defaultCompareMonthKey);
@@ -329,6 +343,15 @@ const previousRows = computed(() => rangeTransactions.value.filter(tx =>
 ));
 const report = computed(() => buildReport(periodRows.value));
 const previousReport = computed(() => buildReport(previousRows.value));
+const incomeSummary = computed(() => calculateIncomeSummary(rangeTransactions.value.filter(tx => {
+  const date = String(tx.date || '').slice(0, 10);
+  return mode.value === 'month'
+    ? date.startsWith(selectedMonth.value)
+    : date >= customStart.value && date <= customEnd.value;
+})));
+const previousIncomeSummary = computed(() => calculateIncomeSummary(rangeTransactions.value.filter(tx =>
+  String(tx.date || '').startsWith(compareMonth.value)
+)));
 
 function combinePeriods(current, previous) {
   const previousById = new Map(previous.map(item => [item.id, item]));

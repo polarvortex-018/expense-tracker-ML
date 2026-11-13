@@ -145,6 +145,7 @@ import { resolveIcon } from '../utils/iconResolver.js';
 import { currencySymbol } from '../utils/currency.js';
 import { sortAccountsByOrder } from '../utils/accountSorter.js';
 import { isInternalAllocation } from '../utils/transactionSemantics.js';
+import { calculateIncomeSummary } from '../utils/incomeSummary.js';
 import BlackHoleCanvas from './BlackHoleCanvas.vue';
 import AccountAdjustmentModal from './AccountAdjustmentModal.vue';
 import InteractiveDonutChart from './InteractiveDonutChart.vue';
@@ -301,33 +302,7 @@ const totalExpenses = computed(() => {
 
 const totalFilteredCategoryExpense = totalExpenses;
 
-const filteredCategoryIncome = computed(() => {
-  const map = {};
-  currentMonthTransactions.value.forEach(t => {
-    if (isInternalAllocation(t) || t.account_id === 'acc_unallocated_funds') return;
-    const isAdjustment = t.transaction_type === 'adjustment' || t.category_id === 'cat_adjustments' || t.category?.name === 'Adjustments';
-    if (isAdjustment && Number(t.include_in_chart) !== 1) return;
-
-    if (t.transaction_type === 'income' || (isAdjustment && t.adjustment_direction === 'add')) {
-      const category = props.categories.find(c => c.id === t.category_id) || t.category;
-      const bucket = props.buckets.find(b => b.id === t.bucket_id) || t.bucket;
-      const catName = category ? category.name : (bucket ? bucket.name : (isAdjustment ? 'Adjustments' : 'Uncategorized'));
-      const catColor = category?.color || bucket?.color || (isAdjustment ? '#a855f7' : '#10b981');
-      const catIcon = category?.icon || bucket?.icon || (isAdjustment ? 'tune' : 'category');
-      const amt = Number(t.amount) || 0;
-      if (!map[catName]) {
-        map[catName] = { id: category?.id || bucket?.id || null, name: catName, color: catColor, icon: catIcon, total: 0 };
-      }
-      map[catName].total += amt;
-    }
-  });
-
-  return Object.values(map).sort((a, b) => b.total - a.total);
-});
-
-const totalIncome = computed(() => {
-  return filteredCategoryIncome.value.reduce((sum, c) => sum + c.total, 0);
-});
+const totalIncome = computed(() => calculateIncomeSummary(currentMonthTransactions.value).total);
 
 const animateNumberTicker = () => {
   const start = performance.now();

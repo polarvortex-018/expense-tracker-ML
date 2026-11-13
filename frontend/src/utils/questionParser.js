@@ -353,6 +353,12 @@ export function parseFinanceQuestion(text, categories = [], now = new Date(), di
           : items.some((item) => item.kind === 'category') ? 'category' : analytics.groupBy
   }
   const dateRanges = range?.ranges || (range?.startDate ? [{ startDate: range.startDate, endDate: range.endDate }] : [])
-  if (/\b(compare|comparison|versus|vs)\b/.test(value) && dateRanges.length < 2) return { status: 'clarify', message: 'Please name at least two months or date ranges to compare.' }
-  return { status: 'ok', spec: { intent: analytics.intent === 'total' ? `${flow}_total` : analytics.intent, flow, groupBy: analytics.groupBy, direction: analytics.direction || 'desc', rankPosition: analytics.rankPosition || 1, amount: analytics.amount || null, startDate: range?.startDate ?? null, endDate: range?.endDate ?? null, dateRanges, dateLabel: range?.label ?? 'all time', items, accountIds: filters.accountIds, bucketIds: filters.bucketIds } }
+  const asksForComparison = /\b(compare|comparison|versus|vs)\b/.test(value)
+  const comparesRequestedItems = asksForComparison && items.length >= 2 && dateRanges.length < 2
+  if (asksForComparison && dateRanges.length < 2 && !comparesRequestedItems) return { status: 'clarify', message: 'Please name at least two months or date ranges, or two categories or descriptions, to compare.' }
+  // With two explicitly requested items, use the normal grouped-total path so
+  // each description/category gets its own total and chart segment.
+  const intent = comparesRequestedItems ? `${flow}_total` : analytics.intent === 'total' ? `${flow}_total` : analytics.intent
+  const groupBy = comparesRequestedItems ? null : analytics.groupBy
+  return { status: 'ok', spec: { intent, flow, groupBy, direction: analytics.direction || 'desc', rankPosition: analytics.rankPosition || 1, amount: analytics.amount || null, startDate: range?.startDate ?? null, endDate: range?.endDate ?? null, dateRanges, dateLabel: range?.label ?? 'all time', items, accountIds: filters.accountIds, bucketIds: filters.bucketIds } }
 }

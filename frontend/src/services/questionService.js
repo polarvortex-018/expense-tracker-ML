@@ -91,6 +91,19 @@ function compareCategoriesByPeriod(rows, ranges) {
     .sort((left, right) => right.total - left.total)
 }
 
+function compareRequestedItemsByPeriod(rows, ranges, items, flow) {
+  if (ranges.length < 2 || !items.length) return []
+  return assignUniqueColors(items.map((item) => {
+    const matches = (row) => item.kind === 'category'
+      ? String(row.category_id) === String(item.id) || (flow === 'outgoing' && matchesDescription(item.name, row.description))
+      : matchesDescription(item.text, row.description) || (flow === 'outgoing' && row.transaction_type === 'transfer' && matchesDescription(item.text, row.bucket_name))
+    const totals = ranges.map((range) => round(rows
+      .filter((row) => row.date >= range.startDate && row.date <= range.endDate && matches(row))
+      .reduce((sum, row) => sum + (Number(row.amount) || 0), 0)))
+    return { id: itemId(item), name: item.name || item.text, totals, total: round(totals.reduce((sum, amount) => sum + amount, 0)) }
+  }).filter((item) => item.total > 0))
+}
+
 function transactionGroupIds(row, groups, flow) {
   const description = normalize(row.description)
   const bucketName = normalize(row.bucket_name)
@@ -155,7 +168,8 @@ function aggregate(rows, spec) {
     groups,
     transactions: uniqueRows.map((row) => ({ ...row, groupIds: transactionGroupIds(row, groups, spec.flow) })),
     groupMode: spec.dateRanges?.length > 1 ? 'period' : spec.items.length ? 'requested' : 'category',
-    categoryComparisons: compareCategoriesByPeriod(uniqueRows, spec.dateRanges || []),
+    categoryComparisons: spec.items.length ? [] : compareCategoriesByPeriod(uniqueRows, spec.dateRanges || []),
+    itemComparisons: compareRequestedItemsByPeriod(uniqueRows, spec.dateRanges || [], spec.items || [], spec.flow),
     overlap: requested.overlap
   }
 }

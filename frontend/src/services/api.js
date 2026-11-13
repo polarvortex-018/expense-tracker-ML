@@ -907,11 +907,11 @@ export const api = {
         // 3. Log the allocation as a transfer; the original salary was already recorded as income.
         const txId = generateUUID();
         const bObj = targetBucketId ? execQuery('SELECT name FROM savings_buckets WHERE id = ?', [targetBucketId])[0] : null;
-        const allocDesc = bObj ? `Salary Allocation → ${bObj.name}` : desc;
+        const allocDesc = bObj ? `Salary Allocation → ${bObj.name}` : `Salary Allocation: ${desc.replace(/^salary allocation\s*[:→-]?\s*/i, '')}`;
         execRun(
           `INSERT INTO transactions (id, amount, transaction_type, adjustment_direction, description, date, account_id, bucket_id, category_id, created_at, updated_at, include_in_chart)
-           VALUES (?, ?, 'transfer', 'add', ?, ?, ?, ?, NULL, ?, ?, 0)`,
-          [txId, rounded, allocDesc, today, targetAccountId || actualSourceAccountId, targetBucketId, now, now],
+           VALUES (?, ?, 'transfer', 'add', ?, ?, ?, ?, ?, ?, ?, 0)`,
+          [txId, rounded, allocDesc, today, targetAccountId || actualSourceAccountId, targetBucketId, rule.category_id || null, now, now],
           false
         );
 

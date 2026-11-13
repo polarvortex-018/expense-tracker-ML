@@ -107,16 +107,16 @@
               />
             </section>
 
-            <section v-if="result.categoryComparisons?.length" class="rounded-2xl border border-[#1f202e] bg-[#0f1019] p-4">
-              <h3 class="text-sm font-bold text-[#f1f0f5]">Category changes</h3>
-              <p class="mt-1 text-xs text-[#9e9cae]">Compare each category across the selected months.</p>
+            <section v-if="result.itemComparisons?.length || result.categoryComparisons?.length" class="rounded-2xl border border-[#1f202e] bg-[#0f1019] p-4">
+              <h3 class="text-sm font-bold text-[#f1f0f5]">{{ result.itemComparisons?.length ? 'Requested item comparison' : 'Category changes' }}</h3>
+              <p class="mt-1 text-xs text-[#9e9cae]">Compare {{ result.itemComparisons?.length ? 'each requested item' : 'each category' }} across the selected periods.</p>
               <div class="mt-3 overflow-x-auto">
                 <table class="w-full min-w-max text-left text-xs tabular-nums">
-                  <thead><tr class="border-b border-[#29293a] text-[#9e9cae]"><th class="sticky left-0 bg-[#0f1019] py-2 pr-4 font-semibold">Category</th><th v-for="period in result.groups" :key="period.id" class="px-3 py-2 text-right font-semibold">{{ period.name }}</th></tr></thead>
+                  <thead><tr class="border-b border-[#29293a] text-[#9e9cae]"><th class="sticky left-0 bg-[#0f1019] py-2 pr-4 font-semibold">{{ result.itemComparisons?.length ? 'Item' : 'Category' }}</th><th v-for="period in result.groups" :key="period.id" class="px-3 py-2 text-right font-semibold">{{ period.name }}</th></tr></thead>
                   <tbody class="divide-y divide-[#1f202e]">
-                    <tr v-for="category in result.categoryComparisons" :key="category.id">
-                      <th class="sticky left-0 bg-[#0f1019] py-2 pr-4 text-left font-medium text-[#ccc3d8]"><span class="mr-2 inline-block size-2 rounded-full" :style="{ backgroundColor: category.color || '#9e9cae' }"></span>{{ category.name }}</th>
-                      <td v-for="(total, index) in category.totals" :key="index" class="px-3 py-2 text-right text-[#f1f0f5]">{{ money(total) }}</td>
+                    <tr v-for="item in result.itemComparisons?.length ? result.itemComparisons : result.categoryComparisons" :key="item.id">
+                      <th class="sticky left-0 bg-[#0f1019] py-2 pr-4 text-left font-medium text-[#ccc3d8]"><span class="mr-2 inline-block size-2 rounded-full" :style="{ backgroundColor: item.color || '#9e9cae' }"></span>{{ item.name }}</th>
+                      <td v-for="(total, index) in item.totals" :key="index" class="px-3 py-2 text-right text-[#f1f0f5]">{{ money(total) }}</td>
                     </tr>
                     <tr class="border-t border-[#29293a] font-bold"><th class="sticky left-0 bg-[#0f1019] py-2 pr-4 text-left text-[#f1f0f5]">Total</th><td v-for="period in result.groups" :key="period.id" class="px-3 py-2 text-right text-[#f1f0f5]">{{ money(period.total) }}</td></tr>
                   </tbody>
